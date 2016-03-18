@@ -42,6 +42,10 @@ iex(1)> {:ok, conn} = Epiphany.new()
 # Open a connection to 10.5.5.5 on 9043
 iex(1)> {:ok, conn} = Epiphany.new({'10.5.5.5', 9043})
 {:ok, #PID<0.124.0>}
+
+# Closing a connection
+iex(2)> Epiphany.close(conn)
+:ok
 ```
 The connection can (and should) be shared among several clients.
 
@@ -54,11 +58,87 @@ iex(2)> Epiphany.query(conn, "use excelsior")
 iex(3)> Epiphany.query(conn, "INSERT INTO users(user_name, birth_year) VALUES ('alice', 1993)")          
 {:result, :void}
 
-iex(4)> Epiphany.query(conn, "SELECT * FROM users")
-{:result,
- [["bob", <<0, 0, 0, 0, 0, 0, 7, 110>>],
-  ["alice", <<0, 0, 0, 0, 0, 0, 7, 201>>]]}
+iex(4)> {:result, result} = Epiphany.query(conn, "SELECT * FROM users")
+{:result, %Epiphany.Result{... omitted ...}}
 ```
+
+Using `%Epiphany.Result`:
+
+```elixir
+iex(5)> result.row_count
+3
+
+iex(6)> Enum.map(result.rows, &(Epiphany.Result.Row.as_text(&1,0)))
+["bob", "peter", "alice"]
+
+iex(7)> Enum.map(result.rows, &(Epiphany.Result.Row.as_bigint(&1,1)))
+[1902, 1967, 1993]
+```
+
+Complex queries:
+
+```elixir
+iex(8)> Epiphany.query(
+          conn,
+          %Epiphany.Query{
+            statement: "SELECT * FROM users WHERE user_name = ?",
+            values: [Epiphany.DataTypes.to_text("peter")],
+            consistency: :one,
+            page_size: 1,
+            paging_state: result.paging_state})
+```
+
+`statement` can include value placeholders (`?`).  `values` is a list of bytestrings
+ used with the placeholders.  `Epiphany.DataTypes` contains functions `to_XXX` to 
+ be used to encode various types into bytestrings.
+ 
+`consistency` can be set to the following values:
+ 
+* `:one`
+* `:two`
+* `:three`
+* `:quorum`
+* `:all`
+* `:local_quorum`
+* `:each_quorum`
+* `:serial`
+* `:local_serial`
+* `:local_one`
+ 
+`page_size` is used to control the size of the result set for each query.  The result
+set will contain at most `page_size` rows.  If there are more rows available, 
+`paging_state` will be not-nil in the returned `%Epiphany.Result`, 
+and can be used to run the exact same query with the `paging_state`.  Example:
+ 
+```elixir
+iex(9)> {:result, result} = Epiphany.query(
+                              conn,
+                              %Epiphany.Query{
+                                statement: "SELECT * FROM users",
+                                page_size: 1})
+{:result,
+ %Epiphany.Result{
+    row_count: 1,
+    rows: [%Epiphany.Result.Row{
+             col_count: 2, 
+             columns: ["bob", <<0, 0, 0, 0, 0, 0, 7, 110>>]}]}}
+
+iex(10)> {:result, result} = Epiphany.query(
+                               conn,
+                               %Epiphany.Query{
+                                 statement: "SELECT * FROM users", 
+                                 page_size: 1, 
+                                 paging_state:  result.paging_state})
+{:result,
+ %Epiphany.Result{
+    row_count: 1,
+    rows: [%Epiphany.Result.Row{
+              col_count: 2,
+              columns: ["peter", <<0, 0, 0, 0, 0, 0, 7, 175>>]}]}}
+```
+
+Note that it will likely be detrimental to performance to pick a `page_size` value too low. 
+A value below 100 is probably too low for most use cases.
 
 Using prepared queries:
 
@@ -69,16 +149,7 @@ iex(5)> {:result, {:prepared, id}} = Epiphany.prepare(conn, "SELECT * FROM users
   <<101, 144, 20, 44, 208, 131, 139, 221, 194, 118, 95, 142, 46, 35, 223, 228>>}}
   
 iex(6)> Epiphany.execute(conn, id)
-{:result,
- [["bob", <<0, 0, 0, 0, 0, 0, 7, 110>>],
-  ["alice", <<0, 0, 0, 0, 0, 0, 7, 201>>]]}
-```
-
-Closing the connection:
-
-```elixir
-iex(7)> Epiphany.close(conn)
-:ok
+{:result, %Epiphany.Result{... omitted ...}}
 ```
 
 ## Roadmap
@@ -87,12 +158,10 @@ A lot of things left to do.  My main goal is to improve the quality of the code,
 the tests and the documentation.  I use this project to learn the "Elixir Way".
 Other than that, here is a non-exhaustive list of what I have in mind:
 
-* Improve access to query result.  Including functions to turn the bytes into
-the expected type (e.g. int, string, list, etc).  Also, support access to `paging_state`
-to query for the rest of the result set
+* Support missing data types (decimal, inet, uuid, varint and timeuuid)
 * Access to metadata in query result to be able to access fields by name instead of
 by indices
-* Support creating queries with value placeholders and more parameters like consistency
+* Add more query parameters (mainly serial_consistency)
 * Handle reconnection to a node
 * Support authentication and SSL
 * Support batch statements

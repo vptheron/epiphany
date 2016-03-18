@@ -12,8 +12,18 @@ defmodule Epiphany do
     Connection.send(c, Request.options())
   end
 
-  def query(c, q) do
-    Connection.send(c, Request.query(q))
+  def query(c, q = %Epiphany.Query{}) do
+    Connection.send(c, Request.query(
+      q.statement,
+      q.consistency,
+      q.values,
+      q.page_size,
+      q.paging_state
+    ))
+  end
+
+  def query(c, q) when is_binary(q) do
+    query(c, %Epiphany.Query{statement: q})
   end
 
   def prepare(c, q) do

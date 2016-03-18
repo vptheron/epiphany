@@ -39,20 +39,20 @@ defmodule Epiphany.Response do
   defp decode_result(0x0001, <<>>), do: :void
 
   defp decode_result(0x0002, rows) when is_binary(rows) do
-    {col_count, _p_state, rest} = decode_result_metadata(rows)
+    {col_count, p_state, rest} = decode_result_metadata(rows)
     {:ok, row_count, content} = Body.read_int(rest)
 
     {all_rows, _} = if row_count > 0 do
-     Enum.reduce((1..row_count), {[], content}, fn(_, {row_a, data}) ->
-
-      {row, after_row} = decode_row(data, col_count)
-      {[row|row_a], after_row}
-    end )
+      Enum.reduce((1..row_count), {[], content}, fn(_, {row_a, data}) ->
+        {row, after_row} = decode_row(data, col_count)
+        {[row|row_a], after_row}
+      end )
     else
       {[], content}
     end
 
-    Enum.reverse(all_rows)
+    %Epiphany.Result{rows: Enum.reverse(all_rows), row_count: row_count,
+      paging_state: p_state}
   end
 
   defp decode_result(0x0003, body) do
@@ -79,7 +79,11 @@ defmodule Epiphany.Response do
         {:ok, item, after_item} = Body.read_bytes(d)
         {[item|col_a], after_item}
         end )
-   {Enum.reverse(all_cols), rest}
+
+    {
+     %Epiphany.Result.Row{columns: Enum.reverse(all_cols), col_count: col_count},
+     rest
+    }
   end
 
   defp decode_result_metadata(body) do
@@ -87,7 +91,7 @@ defmodule Epiphany.Response do
     {:ok, column_count, after_c_count} = Body.read_int(after_flags)
 
     {_, p_state, after_p_state} =
-    if (flags &&& 0x0002) == 1 do
+    if (flags &&& 0x0002) == 0x0002 do
       Body.read_bytes(after_c_count)
     else
       {:ok, nil, after_c_count}
@@ -96,7 +100,7 @@ defmodule Epiphany.Response do
     # Test 0x0004 cause 0x0001 seems to always match, even when
     # global spec is not there
     after_gs =
-      if ((flags &&& 0x0001) == 1) && ((flags &&& 0x0004) == 0) do
+      if ((flags &&& 0x0001) == 0x0001) && ((flags &&& 0x0004) == 0) do
         {:ok, ks, after_ks} = Body.read_string(after_p_state)
         {:ok, table, after_global_spec} = Body.read_string(after_ks)
         after_global_spec

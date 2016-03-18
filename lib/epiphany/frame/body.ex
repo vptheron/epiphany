@@ -40,6 +40,7 @@ defmodule Epiphany.Frame.Body do
   def write_long_string(s) when is_binary(s), do:
     write_int(byte_size(s)) <> s
 
+  def write_bytes(nil), do: <<255,255,255,255>>
   def write_bytes(b) when is_binary(b), do:
     write_int(byte_size(b)) <> b
 
@@ -50,7 +51,18 @@ defmodule Epiphany.Frame.Body do
 
   def read_long_string(b), do: read_binary(&read_int/1, b)
 
-  def read_bytes(b), do: read_binary(&read_int/1, b)
+  def read_bytes(<< length :: size(32), rest :: binary >>) when length < 0, do:
+    {:ok, nil, rest}
+
+  def read_bytes(<< length :: size(32), s_rest :: binary >>)
+    when byte_size(s_rest) >= length do
+    << b :: binary-size(length), rest :: binary >> = s_rest
+    {:ok, b, rest}
+  end
+
+  def read_bytes(<<length :: size(32), rest :: binary>>)
+    when byte_size(rest) < length, do:
+      {:error, :too_short}
 
   def read_short_bytes(b), do: read_binary(&read_short/1, b)
 

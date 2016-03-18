@@ -20,21 +20,39 @@ defmodule Epiphany.Request do
   end
 
   def query(q, consistency \\ :one,
-    _values \\ nil, _page_size \\ nil, _paging_state \\ nil) do
-    flags =
-      0x00
-      #|> update_flags(values, 0x01)
-      #|> update_flags(page_size, 0x04)
-      #|> update_flags(paging_state, 0x08)
-      |> update_flags(true, 0x02)  # No metadata for now
+    values \\ nil, page_size \\ nil, paging_state \\ nil) do
+    {flags, optional_header} =
+      {0x02, <<>>}                # Set to skip metadata for now
+      |> add_query_values(values)
+      |> add_page_size(page_size)
+      |> add_paging_state(paging_state)
 
     # Add real support for parameters
     body =
       Body.write_long_string(q) <>
       Body.write_consistency(consistency) <>
-      <<flags>>
+      <<flags>> <>
+      optional_header
 
     {0x07, body}
+  end
+
+  defp add_query_values(fh, vs) when is_nil(vs) or length(vs) == 0, do: fh
+
+  defp add_query_values({flags, header}, vs) do
+    with_size = header <> Body.write_short(length(vs))
+    data = Enum.reduce(vs, with_size, fn(v, acc) -> acc <> Body.write_bytes(v) end)
+    {flags ||| 0x01, data}
+  end
+
+  defp add_page_size(fh, nil), do: fh
+  defp add_page_size({flags, header}, page_size) do
+    {flags ||| 0x04, header <> Body.write_int(page_size)}
+  end
+
+  defp add_paging_state(fh, nil), do: fh
+  defp add_paging_state({flags, header}, paging_state) do
+    {flags ||| 0x08, header <> Body.write_bytes(paging_state)}
   end
 
   def prepare(q) do
@@ -45,11 +63,10 @@ defmodule Epiphany.Request do
     _values \\ nil, _page_size \\ nil, _paging_state \\ nil) do
     # Share code with query
     flags =
-      0x00
+      0x02   # No metadata for now
      # |> update_flags(values, 0x01)
      # |> update_flags(page_size, 0x04)
      # |> update_flags(paging_state, 0x08)
-       |> update_flags(true, 0x02)  # No metadata for now
 
     body =
       Body.write_short_bytes(id) <>
