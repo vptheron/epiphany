@@ -12,7 +12,7 @@ defmodule Epiphany.Mixfile do
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
      deps: deps,
-     test_coverage: [tool: ExCoveralls]]
+     test_coverage: [tool: Coverex.Task, coveralls: true]]
   end
 
   def application do
@@ -22,7 +22,7 @@ defmodule Epiphany.Mixfile do
   defp deps do
     [
       {:connection, "~> 1.0"},
-      {:excoveralls, "~> 0.4", only: :test}
+      {:coverex, "~> 1.4.7", only: :test}
     ]
   end
 
