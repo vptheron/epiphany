@@ -2,5 +2,3 @@ language: elixir
 
 elixir:
   - 1.2.3
-
-script: mix test --cover
