@@ -1,6 +1,7 @@
 # Epiphany
 
 [![Build Status](https://travis-ci.org/vptheron/epiphany.svg?branch=master)](https://travis-ci.org/vptheron/epiphany)
+[![hex.pm version](https://img.shields.io/hexpm/v/epiphany.svg)](https://hex.pm/packages/epiphany)
 
 An Elixir driver for [Apache Cassandra](http://cassandra.apache.org/).
 
