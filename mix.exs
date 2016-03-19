@@ -2,7 +2,8 @@ defmodule Epiphany.Mixfile do
   use Mix.Project
 
   def project do
-    [app: :epiphany,
+    [
+     app: :epiphany,
      version: "0.1.0-dev",
      elixir: "~> 1.2",
      name: "Epiphany",
@@ -11,7 +12,12 @@ defmodule Epiphany.Mixfile do
      package: package,
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
-     deps: deps]
+     deps: deps,
+     test_coverage: [tool: ExCoveralls],
+     preferred_cli_env: ["coveralls": :test,
+                         "coveralls.detail": :test,
+                         "coveralls.post": :test]
+    ]
   end
 
   def application do
@@ -20,7 +26,8 @@ defmodule Epiphany.Mixfile do
 
   defp deps do
     [
-      {:connection, "~> 1.0"}
+      {:connection, "~> 1.0"},
+      {:excoveralls, "~> 0.4", only: :test}
     ]
   end
 
