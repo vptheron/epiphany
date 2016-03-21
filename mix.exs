@@ -16,7 +16,8 @@ defmodule Epiphany.Mixfile do
      test_coverage: [tool: ExCoveralls],
      preferred_cli_env: ["coveralls": :test,
                          "coveralls.detail": :test,
-                         "coveralls.post": :test]
+                         "coveralls.post": :test],
+     docs: [extras: ["README.md"]]
     ]
   end
 
@@ -27,7 +28,11 @@ defmodule Epiphany.Mixfile do
   defp deps do
     [
       {:connection, "~> 1.0"},
-      {:excoveralls, "~> 0.4", only: :test}
+      {:excheck, "~> 0.3", only: :test},
+      {:triq, github: "krestenkrab/triq", only: :test},
+      {:excoveralls, "~> 0.4", only: :test},
+      {:earmark, "~> 0.1", only: :dev},
+      {:ex_doc, "~> 0.11", only: :dev}
     ]
   end
 

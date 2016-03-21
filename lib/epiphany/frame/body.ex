@@ -13,21 +13,27 @@ defmodule Epiphany.Frame.Body do
   entity.
   """
 
-  def write_int(i) when is_integer(i), do:  << i :: size(32) >>
+  def write_int(i) when is_integer(i), do:  << i :: signed-integer-size(32) >>
 
-  def write_long(l) when is_integer(l), do:  << l :: size(64) >>
+  def write_long(l) when is_integer(l), do:  << l :: signed-integer-size(64) >>
 
-  def write_short(s) when is_integer(s), do: << s :: size(16) >>
+  def write_short(s) when is_integer(s), do: << s :: unsigned-integer-size(16) >>
 
   def read_int(b), do: read_number(b, 4)
 
   def read_long(b), do: read_number(b, 8)
 
-  def read_short(b), do: read_number(b, 2)
+  def read_short(b) when is_binary(b) and byte_size(b) >= 2 do
+    << n :: unsigned-integer-size(16), rest :: binary >> = b
+    {:ok, n, rest}
+  end
+
+  def read_short(b) when is_binary(b) and byte_size(b) < 2, do:
+    {:error, :too_short}
 
   defp read_number(b, n_size) when is_binary(b) and byte_size(b) >= n_size do
     b_size = n_size * 8
-    << n :: size(b_size), rest :: binary >> = b
+    << n :: signed-integer-size(b_size), rest :: binary >> = b
     {:ok, n, rest}
   end
 
@@ -51,8 +57,7 @@ defmodule Epiphany.Frame.Body do
 
   def read_long_string(b), do: read_binary(&read_int/1, b)
 
-  def read_bytes(<< length :: size(32), rest :: binary >>) when length < 0, do:
-    {:ok, nil, rest}
+  def read_bytes(<< 255,255,255,255 , rest :: binary >>), do: {:ok, nil, rest}
 
   def read_bytes(<< length :: size(32), s_rest :: binary >>)
     when byte_size(s_rest) >= length do
@@ -63,6 +68,7 @@ defmodule Epiphany.Frame.Body do
   def read_bytes(<<length :: size(32), rest :: binary>>)
     when byte_size(rest) < length, do:
       {:error, :too_short}
+  def read_bytes(b) when byte_size(b) < 4, do: {:error, :too_short}
 
   def read_short_bytes(b), do: read_binary(&read_short/1, b)
 
@@ -169,15 +175,9 @@ defmodule Epiphany.Frame.Body do
     end
   end
 
-  def read_consistency(b) do
-    read_short(b)
-    |> flat_map( fn(code, rest) ->
-        {:ok, short_to_consistency(code), rest}
-       end)
-  end
-
-  defp short_to_consistency(b) do
-    case b do
+  def read_consistency(b) when byte_size(b) < 2, do: {:error, :too_short}
+  def read_consistency(<< s :: unsigned-integer-size(16), rest :: binary >>) do
+    c = case s do
       0x0000 -> :any
       0x0001 -> :one
       0x0002 -> :two
@@ -190,6 +190,7 @@ defmodule Epiphany.Frame.Body do
       0x0009 -> :local_serial
       0x000A -> :local_one
     end
+    {:ok, c, rest}
   end
 
   defp flat_map({:ok, item, rest}, f), do: f.(item, rest)
