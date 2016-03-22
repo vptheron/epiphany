@@ -1,11 +1,11 @@
-defmodule FrameTest do
+defmodule Epiphany.FrameTest do
   use ExUnit.Case, async: false
   use ExCheck
 
   import Epiphany.Frame
 
   property "Cannot read when header is missing" do
-    for_all b in such_that(bb in binary when byte_size(bb) < 9), do:
+    for_all b in binary(8), do:
       read_frame(b) == {:error, :incomplete_header}
   end
 

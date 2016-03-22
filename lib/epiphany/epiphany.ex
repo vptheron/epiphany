@@ -18,12 +18,17 @@ defmodule Epiphany do
       q.consistency,
       q.values,
       q.page_size,
-      q.paging_state
+      q.paging_state,
+      q.serial_consistency
     ))
   end
 
   def query(c, q) when is_binary(q) do
     query(c, %Epiphany.Query{statement: q})
+  end
+
+  def query(c, q, vals) when is_binary(q) do
+    query(c, %Epiphany.Query{statement: q, values: vals})
   end
 
   def prepare(c, q) do

@@ -19,8 +19,8 @@ defmodule Epiphany.Request do
     {0x05, <<>>}
   end
 
-  def query(q, consistency \\ :one,
-    values \\ nil, page_size \\ nil, paging_state \\ nil) do
+  def query(q, consistency \\ :one, values \\ nil, page_size \\ nil,
+    paging_state \\ nil, serial_consistency \\ nil) do
     {flags, optional_header} =
       {0x02, <<>>}                # Set to skip metadata for now
       |> add_query_values(values)
@@ -53,6 +53,11 @@ defmodule Epiphany.Request do
   defp add_paging_state(fh, nil), do: fh
   defp add_paging_state({flags, header}, paging_state) do
     {flags ||| 0x08, header <> Body.write_bytes(paging_state)}
+  end
+
+  defp add_serial_consistency(fh, nil), do: fh
+  defp add_serial_consistency({flags, header}, s_consistency) do
+    {flags ||| 0x10, header <> Body.write_consistency(s_consistency)}
   end
 
   def prepare(q) do

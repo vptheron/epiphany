@@ -63,6 +63,12 @@ iex(3)> Epiphany.query(conn, "INSERT INTO users(user_name, birth_year) VALUES ('
 
 iex(4)> {:result, result} = Epiphany.query(conn, "SELECT * FROM users")
 {:result, %Epiphany.Result{... omitted ...}}
+
+iex(4)> {:result, result} = Epiphany.query(
+                              conn, 
+                              "SELECT * FROM users WHERE user_name = ?",
+                              ["peter"])
+{:result, %Epiphany.Result{... omitted ...}}
 ```
 
 Using `%Epiphany.Result`:
@@ -88,7 +94,8 @@ iex(8)> Epiphany.query(
             values: [Epiphany.DataTypes.to_text("peter")],
             consistency: :one,
             page_size: 1,
-            paging_state: result.paging_state})
+            paging_state: result.paging_state,
+            serial_consistency: :local_serial})
 ```
 
 `statement` can include value placeholders (`?`).  `values` is a list of bytestrings
@@ -107,6 +114,9 @@ iex(8)> Epiphany.query(
 * `:serial`
 * `:local_serial`
 * `:local_one`
+
+Note that `:serial` and `:local_serial` are the only supported values for 
+`serial_consistency`.
  
 `page_size` is used to control the size of the result set for each query.  The result
 set will contain at most `page_size` rows.  If there are more rows available, 
@@ -164,7 +174,6 @@ Other than that, here is a non-exhaustive list of what I have in mind:
 * Support missing data types (decimal, inet, uuid, varint and timeuuid)
 * Access to metadata in query result to be able to access fields by name instead of
 by indices
-* Add more query parameters (mainly serial_consistency)
 * Handle reconnection to a node
 * Support authentication and SSL
 * Support batch statements

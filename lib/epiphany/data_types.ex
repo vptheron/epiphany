@@ -7,10 +7,10 @@ defmodule Epiphany.DataTypes do
 
   def from_ascii(b) when is_binary(b), do: b
 
-  def to_bigint(i) when is_integer(i), do: <<i :: integer-size(64) >>
+  def to_bigint(i) when is_integer(i), do: <<i :: signed-integer-size(64) >>
 
   def from_bigint(b) when is_binary(b) do
-    << bi :: integer-size(64) >> = b
+    << bi :: signed-integer-size(64) >> = b
     bi
   end
 
@@ -55,11 +55,15 @@ defmodule Epiphany.DataTypes do
 
   def from_list(b, f) when is_binary(b) do
     {:ok, size, list_bs} = Body.read_int(b)
-    {l, _} = (1..size) |> Enum.reduce({[], list_bs}, fn(_, {items, bs}) ->
-               {:ok, item_bs, after_item} = Body.read_bytes(bs)
-               {[f.(item_bs)|items], after_item}
-             end)
-    Enum.reverse(l)
+    if size == 0 do
+      []
+    else
+      {l, _} = (1..size) |> Enum.reduce({[], list_bs}, fn(_, {items, bs}) ->
+                 {:ok, item_bs, after_item} = Body.read_bytes(bs)
+                 {[f.(item_bs)|items], after_item}
+               end)
+      Enum.reverse(l)
+    end
   end
 
   def to_map(m, kf, vf) when is_map(m) do
@@ -71,12 +75,16 @@ defmodule Epiphany.DataTypes do
 
   def from_map(b, kf, vf) when is_binary(b) do
     {:ok, size, map_bs} = Body.read_int(b)
-    {m, _} = (1..size) |> Enum.reduce({%{}, map_bs}, fn(_, {items, bs}) ->
-               {:ok, key_bs, after_key} = Body.read_bytes(bs)
-               {:ok, value_bs, after_value} = Body.read_bytes(after_key)
-               {Map.put(items, kf.(key_bs), vf.(value_bs)), after_value}
-             end)
-    m
+    if size == 0 do
+      %{}
+    else
+      {m, _} = (1..size) |> Enum.reduce({%{}, map_bs}, fn(_, {items, bs}) ->
+                 {:ok, key_bs, after_key} = Body.read_bytes(bs)
+                 {:ok, value_bs, after_value} = Body.read_bytes(after_key)
+                 {Map.put(items, kf.(key_bs), vf.(value_bs)), after_value}
+               end)
+      m
+    end
   end
 
   def to_set(s = %MapSet{}, f) do
@@ -86,11 +94,15 @@ defmodule Epiphany.DataTypes do
 
   def from_set(b, f) do
     {:ok, size, set_bs} = Body.read_int(b)
-    {s, _} = (1..size) |> Enum.reduce({MapSet.new, set_bs}, fn(_, {items, bs}) ->
-               {:ok, item_bs, after_item} = Body.read_bytes(bs)
-               {MapSet.put(items, f.(item_bs)), after_item}
-             end)
-    s
+    if size == 0 do
+        MapSet.new
+    else
+      {s, _} = (1..size) |> Enum.reduce({MapSet.new, set_bs}, fn(_, {items, bs}) ->
+                 {:ok, item_bs, after_item} = Body.read_bytes(bs)
+                 {MapSet.put(items, f.(item_bs)), after_item}
+               end)
+      s
+    end
   end
 
   def to_text(t) when is_binary(t), do: t
