@@ -24,16 +24,16 @@ defmodule Epiphany.Connection do
   end
 
   def close(conn) do
-    GenServer.cast(conn, :close)
+    GenServer.call(conn, :close)
   end
 
   # Callbacks
 
   def init({ip, port}) do
     {:ok, connection} = TcpConnection.start_link(ip, port, self)
-
     streams = Enum.to_list(1..@stream_max)
-    {:ok, %{conn: connection, streams: streams, clients: %{}}}
+    {:ok,
+     %{conn: connection, streams: streams, clients: %{}}}
   end
 
   def handle_cast(:connected, s = %{conn: conn}) do
@@ -57,11 +57,12 @@ defmodule Epiphany.Connection do
     {:noreply, %{s| clients: new_clients, streams: [stream|streams]}}
   end
 
-  def handle_cast(:close, state) do
-      # May need to reply to pending clients with an error
-      TcpConnection.close(state.conn)
-      {:stop, :normal, state}
-    end
+  def handle_call(:close, from, state) do
+    # May need to reply to pending clients with an error
+    TcpConnection.close(state.conn)
+    GenServer.reply(from, :ok)
+    {:stop, :normal, state}
+  end
 
   def handle_call({:send, {op_code, body}},
                   from,
@@ -69,10 +70,17 @@ defmodule Epiphany.Connection do
 
     [stream|new_streams] = streams  # Handle case where there is no more streams
 
-    conn
-    |> TcpConnection.send(%Epiphany.Frame{stream: stream, op_code: op_code, body: body})
+    result = conn
+    |> TcpConnection.send(
+         %Epiphany.Frame{stream: stream, op_code: op_code, body: body})
 
-    {:noreply, %{s| streams: new_streams, clients: Map.put(clients, stream, from)}}
+    case result do
+      error = {:error, _} ->
+        {:reply, error, s}
+      :ok ->
+        {:noreply,
+         %{s| streams: new_streams, clients: Map.put(clients, stream, from)}}
+    end
   end
 
 end

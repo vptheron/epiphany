@@ -6,38 +6,40 @@ defmodule Epiphany.Frame.TcpConnection do
   The client is given at creation time and will always be the recipient of
   incoming frames.
   """
-
+  require Logger
   use Connection
 
   alias Epiphany.Frame
 
-  def start_link(host, port, client, opts \\ [], timeout \\ 5000) do
+  def start_link(host, port, client, timeout \\ 5000) do
     Connection.start_link(
       __MODULE__,
-      {host, port, opts, timeout, client})
+      {host, port, timeout, client})
   end
 
   def send(conn, frame = %Epiphany.Frame{}), do:
-    Connection.cast(conn, {:send, frame})  # investigate if call is better here
+    Connection.call(conn, {:send, frame})
 
   def close(conn), do: Connection.call(conn, :close)
 
   # Callbacks
 
-  def init({host, port, opts, timeout, client}) do
-    s = %{host: to_char_list(host), port: port, opts: opts, timeout: timeout,
+  def init({host, port, timeout, client}) do
+    s = %{host: to_char_list(host), port: port, timeout: timeout,
           sock: nil, client: client, buffer: <<>>}
     {:connect, :init, s}
   end
 
-  def connect(_, %{sock: nil, host: host, port: port, opts: opts,
+  def connect(_info, %{sock: nil, host: host, port: port,
     timeout: timeout, client: client} = s) do
-    case :gen_tcp.connect(host, port,
-      [:binary, active: true] ++ opts, timeout) do
+    case :gen_tcp.connect(host, port, [:binary, active: true], timeout) do
         {:ok, sock} ->
+          Logger.debug "Connected to #{host}:#{port}"
           GenServer.cast(client, :connected)
           {:ok, %{s | sock: sock}}
-        {:error, _} -> {:backoff, 1000, s}
+        {:error, _} ->
+          Logger.warn "Failed to connect to #{host}:#{port}"
+          {:backoff, 2000, s}  # Make this configurable?
     end
   end
 
@@ -46,23 +48,21 @@ defmodule Epiphany.Frame.TcpConnection do
     case info do
       {:close, from} ->
         Connection.reply(from, :ok)
-      {:error, :closed} ->
-        :error_logger.format("Connection closed~n", [])
+        {:stop, :normal, s}
       {:error, reason} ->
-        reason = :inet.format_error(reason)
-        :error_logger.format("Connection error: ~s~n", [reason])
+        Logger.warn "Disconnecting: #{reason}"
+        {:connect, :reconnect, %{s | sock: nil}}
     end
-    {:connect, :reconnect, %{s | sock: nil}}
   end
 
-  def handle_cast(_, %{sock: nil} = s) do
-    {:reply, {:error, :closed}, s}
+  def handle_call(_, _, %{sock: nil} = s) do
+    {:reply, {:error, :disconnected}, s}
   end
 
-  def handle_cast({:send, frame}, %{sock: sock} = s) do
+  def handle_call({:send, frame}, _, %{sock: sock} = s) do
     case :gen_tcp.send(sock, Frame.write_frame(frame)) do
-      :ok -> {:noreply, s}
-      {:error, _} = error ->{:disconnect, error, error, s}
+      :ok -> {:reply, :ok, s}
+      {:error, _} = error ->  {:disconnect, error, error, s}
     end
   end
 
@@ -72,6 +72,10 @@ defmodule Epiphany.Frame.TcpConnection do
 
   def handle_info({:tcp, _, msg}, %{buffer: buffer} = s) do
     read_frame(%{s | buffer: buffer <> msg})
+  end
+
+  def handle_info({:tcp_closed, _}, s) do
+    {:disconnect, {:error, :closed}, s}
   end
 
   defp read_frame(%{client: client, buffer: buffer} = s) do
