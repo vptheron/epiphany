@@ -24,15 +24,19 @@ currently tested against Apache Cassandra 3.3.
 
 ### Installation
 
-Add epiphany to your list of dependencies in `mix.exs`:
+Add *epiphany* to your list of dependencies in `mix.exs`:
 
     def deps do
       [{:epiphany, "~> 0.1.0-dev"}]
     end
     
+Note that the version published on *Hex* may not have all the features listed
+in this README.  To use the latest version of the code, use a Github dependency
+in `mix.exs`.
+
 ### Examples
 
-For now, *Epiphany* supports opening/closing a connection to one Cassandra node, 
+For now, **Epiphany** supports opening/closing a connection to one Cassandra node, 
 and running simple queries.
 
 Opening a connection:
@@ -50,7 +54,11 @@ iex(1)> {:ok, conn} = Epiphany.new({'10.5.5.5', 9043})
 iex(2)> Epiphany.close(conn)
 :ok
 ```
-The connection can (and should) be shared among several clients.
+The connection can (and should) be shared among several clients.  Note that **Epiphany** uses
+the [Connection](https://github.com/fishcakez/connection) behaviour to handle automatic
+reconnection.  If the Cassandra node you are trying to reach goes down, the client
+will try to reconnect every few seconds.  In the mean time, requests are rejected
+(i.e. there is no queuing of the requests when in disconnected mode).
 
 Running simple queries:
 
