@@ -176,7 +176,7 @@ Other than that, here is a non-exhaustive list of what I have in mind:
 * Support missing data types (decimal, inet, uuid, varint and timeuuid)
 * Access to metadata in query result to be able to access fields by name instead of
 by indices
-* Handle reconnection to a node
+* Handle reconnection to a node (already done, but need more testing)
 * Support authentication and SSL
 * Support batch statements
 * Introduce `Cluster` type to support connection to an entire cluster with automatic
