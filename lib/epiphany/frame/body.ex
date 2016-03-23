@@ -72,18 +72,15 @@ defmodule Epiphany.Frame.Body do
 
   def read_short_bytes(b), do: read_binary(&read_short/1, b)
 
-  defp read_binary(read_count, data) when is_binary(data) do
-    read_count.(data)
-    |> flat_map( fn(count, item_and_rest) ->
-      case byte_size(item_and_rest) >= count do
-        true ->
-          << s :: binary-size(count), rest :: binary >> = item_and_rest
-          {:ok, s, rest}
-        false ->
-          {:error, :too_short}
-      end
-    end)
+  defp read_binary(count_reader, data) when is_binary(data), do:
+    count_reader.(data) |> flat_map(&read_binary_with_count/2)
+
+  defp read_binary_with_count(count, data) when byte_size(data) >= count do
+    << s :: binary-size(count), rest :: binary >> = data
+    {:ok, s, rest}
   end
+  defp read_binary_with_count(count, data) when byte_size(data) < count, do:
+    {:error, :too_short}
 
     # TODO uuid
 

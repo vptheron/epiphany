@@ -33,26 +33,26 @@ defmodule Epiphany.Frame.TcpConnection do
   def connect(_info, %{sock: nil, host: host, port: port,
     timeout: timeout, client: client} = s) do
     case :gen_tcp.connect(host, port, [:binary, active: true], timeout) do
-        {:ok, sock} ->
-          Logger.debug "Connected to #{host}:#{port}"
-          GenServer.cast(client, :connected)
-          {:ok, %{s | sock: sock}}
-        {:error, _} ->
-          Logger.warn "Failed to connect to #{host}:#{port}"
-          {:backoff, 2000, s}  # Make this configurable?
+      {:ok, sock} ->
+        Logger.debug "Connected to #{host}:#{port}"
+        GenServer.cast(client, :connected)
+        {:ok, %{s | sock: sock}}
+      {:error, _} ->
+        Logger.warn "Failed to connect to #{host}:#{port}"
+        {:backoff, 2000, s}  # Make this configurable?
     end
   end
 
-  def disconnect(info, %{sock: sock} = s) do
-    :ok = :gen_tcp.close(sock)
-    case info do
-      {:close, from} ->
-        Connection.reply(from, :ok)
-        {:stop, :normal, s}
-      {:error, reason} ->
-        Logger.warn "Disconnecting: #{reason}"
-        {:connect, :reconnect, %{s | sock: nil}}
-    end
+  def disconnect({:close, from}, %{sock: sock} = s) do
+    :gen_tcp.close(sock)
+    Connection.reply(from, :ok)
+    {:stop, :normal, s}
+  end
+
+  def disconnect({:error, reason}, %{sock: sock} = s) do
+    :gen_tcp.close(sock)
+    Logger.warn "Disconnecting after error: #{reason}"
+    {:connect, :reconnect, %{s | sock: nil}}
   end
 
   def handle_call(_, _, %{sock: nil} = s) do

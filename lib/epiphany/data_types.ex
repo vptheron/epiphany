@@ -55,14 +55,14 @@ defmodule Epiphany.DataTypes do
 
   def from_list(b, f) when is_binary(b) do
     {:ok, size, list_bs} = Body.read_int(b)
-    if size == 0 do
-      []
-    else
-      {l, _} = (1..size) |> Enum.reduce({[], list_bs}, fn(_, {items, bs}) ->
-                 {:ok, item_bs, after_item} = Body.read_bytes(bs)
-                 {[f.(item_bs)|items], after_item}
-               end)
-      Enum.reverse(l)
+    case size do
+      0 -> []
+      _ ->
+        {l, _} = (1..size) |> Enum.reduce({[], list_bs}, fn(_, {items, bs}) ->
+                   {:ok, item_bs, after_item} = Body.read_bytes(bs)
+                   {[f.(item_bs)|items], after_item}
+                 end)
+        Enum.reverse(l)
     end
   end
 
@@ -75,15 +75,15 @@ defmodule Epiphany.DataTypes do
 
   def from_map(b, kf, vf) when is_binary(b) do
     {:ok, size, map_bs} = Body.read_int(b)
-    if size == 0 do
-      %{}
-    else
-      {m, _} = (1..size) |> Enum.reduce({%{}, map_bs}, fn(_, {items, bs}) ->
-                 {:ok, key_bs, after_key} = Body.read_bytes(bs)
-                 {:ok, value_bs, after_value} = Body.read_bytes(after_key)
-                 {Map.put(items, kf.(key_bs), vf.(value_bs)), after_value}
-               end)
-      m
+    case size do
+      0 -> %{}
+      _ ->
+        {m, _} = (1..size) |> Enum.reduce({%{}, map_bs}, fn(_, {items, bs}) ->
+                   {:ok, key_bs, after_key} = Body.read_bytes(bs)
+                   {:ok, value_bs, after_value} = Body.read_bytes(after_key)
+                   {Map.put(items, kf.(key_bs), vf.(value_bs)), after_value}
+                 end)
+        m
     end
   end
 
@@ -94,14 +94,15 @@ defmodule Epiphany.DataTypes do
 
   def from_set(b, f) do
     {:ok, size, set_bs} = Body.read_int(b)
-    if size == 0 do
-        MapSet.new
-    else
-      {s, _} = (1..size) |> Enum.reduce({MapSet.new, set_bs}, fn(_, {items, bs}) ->
-                 {:ok, item_bs, after_item} = Body.read_bytes(bs)
-                 {MapSet.put(items, f.(item_bs)), after_item}
-               end)
-      s
+    case size do
+      0 -> MapSet.new
+
+      _ ->
+        {s, _} = (1..size) |> Enum.reduce({MapSet.new, set_bs}, fn(_, {items, bs}) ->
+                   {:ok, item_bs, after_item} = Body.read_bytes(bs)
+                   {MapSet.put(items, f.(item_bs)), after_item}
+                 end)
+        s
     end
   end
 

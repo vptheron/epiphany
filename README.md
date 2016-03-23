@@ -89,8 +89,8 @@ Complex queries:
 ```elixir
 iex(8)> Epiphany.query(
           conn,
-          %Epiphany.Query{
-            statement: "SELECT * FROM users WHERE user_name = ?",
+          "SELECT * FROM users WHERE user_name = ?",
+          %Epiphany.Query.Parameters{
             values: [Epiphany.DataTypes.to_text("peter")],
             consistency: :one,
             page_size: 1,
@@ -98,7 +98,7 @@ iex(8)> Epiphany.query(
             serial_consistency: :local_serial})
 ```
 
-`statement` can include value placeholders (`?`).  `values` is a list of bytestrings
+Query statements can include value placeholders (`?`).  `values` is a list of bytestrings
  used with the placeholders.  `Epiphany.DataTypes` contains functions `to_XXX` to 
  be used to encode various types into bytestrings.
  
@@ -126,9 +126,8 @@ and can be used to run the exact same query with the `paging_state`.  Example:
 ```elixir
 iex(9)> {:result, result} = Epiphany.query(
                               conn,
-                              %Epiphany.Query{
-                                statement: "SELECT * FROM users",
-                                page_size: 1})
+                              "SELECT * FROM users",
+                              %Epiphany.Query.Parameters{page_size: 1})
 {:result,
  %Epiphany.Result{
     row_count: 1,
@@ -138,8 +137,8 @@ iex(9)> {:result, result} = Epiphany.query(
 
 iex(10)> {:result, result} = Epiphany.query(
                                conn,
-                               %Epiphany.Query{
-                                 statement: "SELECT * FROM users", 
+                               "SELECT * FROM users",
+                               %Epiphany.Query.Parameters{
                                  page_size: 1, 
                                  paging_state:  result.paging_state})
 {:result,
@@ -164,6 +163,9 @@ iex(5)> {:result, {:prepared, id}} = Epiphany.prepare(conn, "SELECT * FROM users
 iex(6)> Epiphany.execute(conn, id)
 {:result, %Epiphany.Result{... omitted ...}}
 ```
+
+Note that `execute` can be given a `%Epiphany.Query.Parameters` to parameterized
+the query similarly to `query`.
 
 ## Roadmap
 

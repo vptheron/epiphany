@@ -12,31 +12,46 @@ defmodule Epiphany do
     Connection.send(c, Request.options())
   end
 
-  def query(c, q = %Epiphany.Query{}) do
+  def query(c, q, params = %Epiphany.Query.Parameters{}) do
     Connection.send(c, Request.query(
-      q.statement,
-      q.consistency,
-      q.values,
-      q.page_size,
-      q.paging_state,
-      q.serial_consistency
+      q,
+      params.consistency,
+      params.values,
+      params.page_size,
+      params.paging_state,
+      params.serial_consistency
     ))
   end
 
-  def query(c, q) when is_binary(q) do
-    query(c, %Epiphany.Query{statement: q})
+  def query(c, q, vals) when is_list(vals) do
+    query(c, q, %Epiphany.Query.Parameters{values: vals})
   end
 
-  def query(c, q, vals) when is_binary(q) do
-    query(c, %Epiphany.Query{statement: q, values: vals})
+  def query(c, q) when is_binary(q) do
+    query(c, q, %Epiphany.Query.Parameters{})
   end
 
   def prepare(c, q) do
     Connection.send(c, Request.prepare(q))
   end
 
+  def execute(c, id, params = %Epiphany.Query.Parameters{}) do
+     Connection.send(c, Request.execute(
+       id,
+       params.consistency,
+       params.values,
+       params.page_size,
+       params.paging_state,
+       params.serial_consistency
+     ))
+   end
+
+  def execute(c, id, vals) when is_list(vals) do
+    execute(c, id, %Epiphany.Query.Parameters{values: vals})
+  end
+
   def execute(c, id) do
-    Connection.send(c, Request.execute(id))
+    execute(c, id, %Epiphany.Query.Parameters{})
   end
 
   def close(c), do: Connection.close(c)
