@@ -16,10 +16,11 @@ defmodule Epiphany.Request do
   def options(), do: {0x05, <<>>}
 
   def query(q, consistency \\ :one, values \\ nil, page_size \\ nil,
-    paging_state \\ nil, serial_consistency \\ nil) do
+    paging_state \\ nil, serial_consistency \\ nil, skip_metadata \\ false) do
 
     {flags, optional_header} =
-      query_flags_header(values, page_size, paging_state, serial_consistency)
+      query_flags_header(values, page_size, paging_state, serial_consistency,
+        skip_metadata)
 
     body =
       Body.write_long_string(q) <>
@@ -33,10 +34,11 @@ defmodule Epiphany.Request do
   def prepare(q), do: {0x09, Body.write_long_string(q)}
 
   def execute(id, consistency \\ :one, values \\ nil, page_size \\ nil,
-               paging_state \\ nil, serial_consistency \\ nil) do
+    paging_state \\ nil, serial_consistency \\ nil, skip_metadata \\ false) do
 
     {flags, optional_header} =
-      query_flags_header(values, page_size, paging_state, serial_consistency)
+      query_flags_header(values, page_size, paging_state, serial_consistency,
+        skip_metadata)
 
     body =
       Body.write_short_bytes(id) <>
@@ -47,8 +49,10 @@ defmodule Epiphany.Request do
     {0x0A, body}
   end
 
-  defp query_flags_header(values, page_size, paging_state, serial_consistency), do:
-    {0x02, <<>>}                # Set to skip metadata for now
+  defp query_flags_header(values, page_size, paging_state, serial_consistency,
+    skip_metadata), do:
+    {0x00, <<>>}
+      |> add_skip_metadata(skip_metadata)
       |> add_query_values(values)
       |> add_page_size(page_size)
       |> add_paging_state(paging_state)
@@ -57,6 +61,9 @@ defmodule Epiphany.Request do
   # Add batch support
 
   # Add register support
+
+  defp add_skip_metadata(fh, false), do: fh
+  defp add_skip_metadata({flags, header}, true), do: {flags ||| 0x02, header}
 
   defp add_query_values(fh, vs) when is_nil(vs) or length(vs) == 0, do: fh
 

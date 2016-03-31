@@ -97,6 +97,9 @@ defmodule Epiphany.Response do
       {:ok, nil, after_c_count}
     end
 
+    {optional_metadata, after_opt_meta} =
+      read_optional_metadata(flags, after_p_state)
+
     # Test 0x0004 cause 0x0001 seems to always match, even when
     # global spec is not there
     after_gs =
@@ -112,6 +115,9 @@ defmodule Epiphany.Response do
 
     {column_count, p_state, after_gs}
   end
+
+  defp read_optional_metadata(flags, data) when (flags &&& 0x0004) == 0x0004, do:
+    {nil, data}
 
   # Event
 

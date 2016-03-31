@@ -19,7 +19,8 @@ defmodule Epiphany do
       params.values,
       params.page_size,
       params.paging_state,
-      params.serial_consistency
+      params.serial_consistency,
+      params.skip_metadata
     ))
   end
 
@@ -42,7 +43,8 @@ defmodule Epiphany do
        params.values,
        params.page_size,
        params.paging_state,
-       params.serial_consistency
+       params.serial_consistency,
+       params.skip_metadata
      ))
    end
 
