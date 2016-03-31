@@ -12,7 +12,8 @@ defmodule Epiphany do
     Connection.send(c, Request.options())
   end
 
-  def query(c, q, params = %Epiphany.Query.Parameters{}) do
+  def query(c, q,
+    params = %Epiphany.Query.Parameters{} \\ %Epiphany.Query.Parameters{}) do
     Connection.send(c, Request.query(
       q,
       params.consistency,
@@ -24,12 +25,8 @@ defmodule Epiphany do
     ))
   end
 
-  def query(c, q, vals) when is_list(vals) do
+  def query_with_values(c, q, vals) when is_list(vals) do
     query(c, q, %Epiphany.Query.Parameters{values: vals})
-  end
-
-  def query(c, q) when is_binary(q) do
-    query(c, q, %Epiphany.Query.Parameters{})
   end
 
   def prepare(c, q) do

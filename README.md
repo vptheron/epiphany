@@ -72,10 +72,10 @@ iex(3)> Epiphany.query(conn, "INSERT INTO users(user_name, birth_year) VALUES ('
 iex(4)> {:result, result} = Epiphany.query(conn, "SELECT * FROM users")
 {:result, %Epiphany.Result{... omitted ...}}
 
-iex(4)> {:result, result} = Epiphany.query(
+iex(4)> {:result, result} = Epiphany.query_with_values(
                               conn, 
                               "SELECT * FROM users WHERE user_name = ?",
-                              ["peter"])
+                              [Epiphany.DataTypes.to_text("peter")])
 {:result, %Epiphany.Result{... omitted ...}}
 ```
 
@@ -90,7 +90,15 @@ iex(6)> Enum.map(result.rows, &(Epiphany.Result.Row.as_text(&1,0)))
 
 iex(7)> Enum.map(result.rows, &(Epiphany.Result.Row.as_bigint(&1,1)))
 [1902, 1967, 1993]
+
+iex(8)> Enum.map(result.rows, &(Epiphany.Result.Row.as_text(&1,"user_name")))   
+["bob", "peter", "alice"]
 ```
+
+Note that the last example (using the name of the field to access the value)
+only works if the query was using `skip_metadata: false`, which is the default 
+value (see next section).  Disabling result metadata reduces the same of the
+response, at the cost of forcing column access by index only.
 
 Complex queries:
 
@@ -103,7 +111,8 @@ iex(8)> Epiphany.query(
             consistency: :one,
             page_size: 1,
             paging_state: result.paging_state,
-            serial_consistency: :local_serial})
+            serial_consistency: :local_serial,
+            skip_metadata: true})
 ```
 
 Query statements can include value placeholders (`?`).  `values` is a list of bytestrings
@@ -183,7 +192,9 @@ Other than that, here is a non-exhaustive list of what I have in mind:
 
 * Support missing data types (decimal, inet, uuid, varint and timeuuid)
 * Access to metadata in query result to be able to access fields by name instead of
-by indices
+by indices (almost there, need to support complex types)
+* Automatic detection of types when querying (avoid using DataTypes)
+* Automatic detection of types when accessing values if metadata is present
 * Handle reconnection to a node (already done, but need more testing)
 * Support authentication and SSL
 * Support batch statements

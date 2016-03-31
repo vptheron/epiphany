@@ -39,12 +39,12 @@ defmodule Epiphany.Response do
   defp decode_result(0x0001, <<>>), do: :void
 
   defp decode_result(0x0002, rows) when is_binary(rows) do
-    {col_count, p_state, rest} = decode_result_metadata(rows)
+    {col_count, p_state, names, rest} = decode_result_metadata(rows)
     {:ok, row_count, content} = Body.read_int(rest)
 
     {all_rows, _} = if row_count > 0 do
       Enum.reduce((1..row_count), {[], content}, fn(_, {row_a, data}) ->
-        {row, after_row} = decode_row(data, col_count)
+        {row, after_row} = decode_row(data, col_count, names)
         {[row|row_a], after_row}
       end )
     else
@@ -73,7 +73,7 @@ defmodule Epiphany.Response do
     {:schema_changed, type, target, options}
   end
 
-  defp decode_row(data, col_count) do
+  defp decode_row(data, col_count, names) do
     {all_cols, rest} =
       Enum.reduce((1..col_count), {[], data}, fn(_, {col_a, d}) ->
         {:ok, item, after_item} = Body.read_bytes(d)
@@ -81,7 +81,10 @@ defmodule Epiphany.Response do
         end )
 
     {
-     %Epiphany.Result.Row{columns: Enum.reverse(all_cols), col_count: col_count},
+     %Epiphany.Result.Row{
+       columns: Enum.reverse(all_cols),
+       col_count: col_count,
+       names: names},
      rest
     }
   end
@@ -97,27 +100,47 @@ defmodule Epiphany.Response do
       {:ok, nil, after_c_count}
     end
 
-    {optional_metadata, after_opt_meta} =
-      read_optional_metadata(flags, after_p_state)
+    {names, after_opt_meta} =
+      read_optional_metadata(flags, after_p_state, column_count)
 
-    # Test 0x0004 cause 0x0001 seems to always match, even when
-    # global spec is not there
-    after_gs =
-      if ((flags &&& 0x0001) == 0x0001) && ((flags &&& 0x0004) == 0) do
-        {:ok, ks, after_ks} = Body.read_string(after_p_state)
-        {:ok, table, after_global_spec} = Body.read_string(after_ks)
-        after_global_spec
-      else
-        after_p_state
-      end
-
-      # Skipping metadata for now
-
-    {column_count, p_state, after_gs}
+    {column_count, p_state, names, after_opt_meta}
   end
 
-  defp read_optional_metadata(flags, data) when (flags &&& 0x0004) == 0x0004, do:
-    {nil, data}
+  defp read_optional_metadata(flags, data, _)
+    when (flags &&& 0x0004) == 0x0004, do: {nil, data}
+
+  defp read_optional_metadata(flags, data, col_count) do
+
+    has_global_spec = (flags &&& 0x0001) == 0x0001
+
+    after_global_t_spec =
+      if has_global_spec do
+        {:ok, ks, after_ks} = Body.read_string(data)
+        {:ok, table, after_global_spec} = Body.read_string(after_ks)
+        # We don't store that for now
+        after_global_spec
+      else
+        data
+      end
+
+    {names, rest} =
+      Enum.reduce((1..col_count), {[], after_global_t_spec}, fn(_, {col_a, d}) ->
+        data =
+          if !has_global_spec do
+            {:ok, ksname, after_ksname} = Body.read_string(d)
+            {:ok, tname, after_tname} = Body.read_string(d)
+            after_tname
+          else
+            d
+          end
+        {:ok, col_name, after_name} = Body.read_string(data)
+        {:ok, _type, after_type} = Body.read_short(after_name)
+        # FIXME handle case where option has a value (list, custom, etc)
+        {[col_name|col_a], after_type}
+      end )
+    {Enum.reverse(names), rest}
+  end
+
 
   # Event
 
