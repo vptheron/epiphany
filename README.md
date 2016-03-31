@@ -97,7 +97,7 @@ iex(8)> Enum.map(result.rows, &(Epiphany.Result.Row.as_text(&1,"user_name")))
 
 Note that the last example (using the name of the field to access the value)
 only works if the query was using `skip_metadata: false`, which is the default 
-value (see next section).  Disabling result metadata reduces the same of the
+value (see next section).  Disabling result metadata reduces the size of the
 response, at the cost of forcing column access by index only.
 
 Complex queries:
