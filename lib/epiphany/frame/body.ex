@@ -72,8 +72,10 @@ defmodule Epiphany.Frame.Body do
 
   def read_short_bytes(b), do: read_binary(&read_short/1, b)
 
-  defp read_binary(count_reader, data) when is_binary(data), do:
-    count_reader.(data) |> flat_map(&read_binary_with_count/2)
+  defp read_binary(count_reader, data) when is_binary(data) do
+    with {:ok, c, rest} <- count_reader.(data),
+    do: read_binary_with_count(c, rest)
+  end
 
   defp read_binary_with_count(count, data) when byte_size(data) >= count do
     << s :: binary-size(count), rest :: binary >> = data
@@ -103,8 +105,8 @@ defmodule Epiphany.Frame.Body do
     write_short(Enum.count(col)) <> Enum.reduce(col, << >>, f)
 
   def read_string_list(b) when is_binary(b) do
-    read_short(b)
-    |> flat_map(&(read_string_list(&1, [], &2)))
+    with {:ok, length, rest} <- read_short(b),
+    do: read_string_list(length, [], rest)
   end
 
   defp read_string_list(0, acc, data), do: {:ok, Enum.reverse(acc), data}
@@ -112,13 +114,13 @@ defmodule Epiphany.Frame.Body do
   defp read_string_list(_list_size, _acc, <<>>), do: {:error, :too_short}
 
   defp read_string_list(list_size, acc, data) do
-    read_string(data)
-    |> flat_map(&(read_string_list(list_size - 1, [&1|acc], &2)))
+    with {:ok, s, rest} <- read_string(data),
+    do: read_string_list(list_size - 1, [s|acc], rest)
   end
 
   def read_string_map(b) when is_binary(b) do
-    read_short(b)
-    |> flat_map( &( read_string_map(&1, %{}, &2) ) )
+    with {:ok, s, rest} <- read_short(b),
+    do: read_string_map(s, %{}, rest)
   end
 
   defp read_string_map(0, acc, data), do: {:ok, acc, data}
@@ -126,16 +128,14 @@ defmodule Epiphany.Frame.Body do
   defp read_string_map(_map_size, _acc, << >>), do: {:error, :too_short}
 
   defp read_string_map(map_size, acc, data) do
-    read_string(data)
-    |> flat_map( fn(key, s_and_rest) ->
-      read_string(s_and_rest)
-      |> flat_map( &(read_string_map(map_size - 1, Map.put(acc, key, &1), &2)) )
-    end)
+   with {:ok, k, rest} <- read_string(data),
+        {:ok, v, rest} <- read_string(rest),
+   do: read_string_map(map_size - 1, Map.put(acc, k, v), rest)
   end
 
   def read_string_multimap(b) when is_binary(b) do
-    read_short(b)
-    |> flat_map( &(read_string_multimap(&1, %{}, &2)) )
+    with {:ok, s, rest} <- read_short(b),
+    do: read_string_multimap(s, %{}, rest)
   end
 
   defp read_string_multimap(0, acc, data), do: {:ok, acc, data}
@@ -143,18 +143,26 @@ defmodule Epiphany.Frame.Body do
   defp read_string_multimap(_map_size, _acc, <<>>), do: {:error, :too_short}
 
   defp read_string_multimap(map_size, acc, data) do
-    read_string(data)
-    |> flat_map( fn(key, s_list_and_rest) ->
-      read_string_list(s_list_and_rest)
-      |> flat_map( &(read_string_multimap(map_size - 1, Map.put(acc, key, &1), &2)) )
-      end)
+    with {:ok, k, rest} <- read_string(data),
+         {:ok, l, rest} <- read_string_list(rest),
+    do: read_string_multimap(map_size - 1, Map.put(acc, k, l), rest)
   end
 
   # TODO option (but may not be possible to generify)
 
   # TODO option list (see above)
 
-  # TODO inet
+  def write_inet({address,port}),
+  do: << byte_size(address) :: size(8) >> <> address <> write_int(port)
+
+  def read_inet(<< s, add_port :: binary >>) when byte_size(add_port) < s,
+  do: {:error, :too_short}
+
+  def read_inet(<<s, add_port :: binary>>) do
+    with << address :: binary-size(s), rest :: binary >> <- add_port,
+         {:ok, port, rest} <- read_int(rest),
+    do: {:ok, {address, port}, rest}
+  end
 
   def write_consistency(c) do
     case c do
@@ -189,8 +197,5 @@ defmodule Epiphany.Frame.Body do
     end
     {:ok, c, rest}
   end
-
-  defp flat_map({:ok, item, rest}, f), do: f.(item, rest)
-  defp flat_map({:error, :too_short} = error, _), do: error
 
 end

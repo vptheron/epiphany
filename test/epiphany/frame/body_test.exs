@@ -150,6 +150,24 @@ defmodule Epiphany.Frame.BodyTest do
 
  # TODO string_multimap
 
+ test "Inet encode / decode" do
+   addr = {<<192,168,1,1>>, 8080}
+   assert {:ok, addr, <<>>} == (addr |> write_inet |> read_inet)
+ end
+
+ test "Inet too short" do
+   assert {:error, :too_short} == (<<4, 192, 168>> |> read_inet)
+ end
+
+ test "Inet port missing" do
+   assert {:error, :too_short} == (<<4, 192, 168, 1, 1>> |> read_inet)
+ end
+
+ test "Inet plus rest" do
+   inet = {<<192,168,1,1>>, 8080}
+   assert {:ok, inet, <<3>>} == (inet |> write_inet |> add_rest |> read_inet)
+ end
+
   property "Consistency encode / decode" do
     for_all c in oneof([:any, :one, :two, :three, :quorum, :all, :local_quorum,
       :serial, :local_serial, :local_one]) do
